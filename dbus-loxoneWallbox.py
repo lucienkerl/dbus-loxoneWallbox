@@ -27,7 +27,7 @@ class DbusLoxoneWallboxService:
     config = self._getConfig()
     deviceinstance = int(config['DEFAULT']['Deviceinstance'])
     acPosition = int(config['DEFAULT']['AcPosition'])
-    pauseBetweenRequests = int(config['ONPREMISE']['PauseBetweenRequests']) # in ms
+    pauseBetweenRequests = int(config['LOXONE']['PauseBetweenRequests']) # in ms
 
     if pauseBetweenRequests <= 20:
       raise ValueError("Pause between requests must be greater than 20")
