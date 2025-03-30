@@ -206,7 +206,7 @@ class DbusLoxoneWallboxService:
           #self._dbusservice['/Ac/L1/Power'] = int(data['nrg'][7])
           #self._dbusservice['/Ac/L2/Power'] = int(data['nrg'][8])
           #self._dbusservice['/Ac/L3/Power'] = int(data['nrg'][9])
-          self._dbusservice['/Ac/Power'] = int(data['LL']['output3']['value'])
+          self._dbusservice['/Ac/Power'] = int(data['LL']['output3']['value']*1000)
           #self._dbusservice['/Current'] = max(data['nrg'][4], data['nrg'][5], data['nrg'][6])
           self._dbusservice['/Ac/Energy/Forward'] = round(data['LL']['output7']['value'], 2)
           
