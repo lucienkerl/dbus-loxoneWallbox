@@ -43,7 +43,7 @@ class DbusLoxoneWallboxService:
     ]
     
     #get data from go-eCharger
-    data = self._getLoxoneWallboxChargerData('sse,fwv')
+    data = self._getLoxoneWallboxChargerData()
 
     # Create the management objects, as specified in the ccgx dbus-api document
     self._dbusservice.add_path('/Mgmt/ProcessName', __file__)
