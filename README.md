@@ -1,37 +1,26 @@
-# dbus-goecharger
-Integrate go-eCharger into Victron Energies Venus OS
+# dbus-loxoneWallbox
+Integrate Loxone Wallbox Block into Victron Energies Venus OS
 
 ## Purpose
-With the scripts in this repo it should be easy possible to install, uninstall, restart a service that connects the go-eCharger to the VenusOS and GX devices from Victron.
+
+With the scripts in this repo it should be easy possible to install, uninstall, restart a service that connects the Loxone Miniserver Wallbox Block to the VenusOS and GX devices from Victron.
 Idea is inspired on @fabian-lauer and @trixing project linked below, many thanks for sharing the knowledge:
 - https://github.com/fabian-lauer/dbus-shelly-3em-smartmeter
 - https://github.com/trixing/venus.dbus-twc3
 
 ## How it works
-### My setup (only relevant for this script)
-- 3-Phase installation
-- Venus OS on Raspberry PI 4 4GB version 1.1 - Firmware v2.84
-  - No other devices from Victron connected
-  - Connected to Wifi netowrk "A"
-- go-eCharger hardware version 2
-  - Make sure in your go-eCharger app that api v1 is activated
-  - Connected to Wifi network "A" with a known IP
-
 ### Details / Process
 What is the script doing:
 - Running as a service
 - connecting to DBus of the Venus OS `com.victronenergy.evcharger.http_{DeviceInstanceID_from_config}`
-- After successful DBus connection go-eCharger is accessed via REST-API - simply the /status is called and a JSON is returned with all details
-  A sample JSON file from Shelly 1PM can be found [here](docs/go-eCharger-status-sample.json)
-- Serial/MAC is taken from the response as device serial
+- After successful DBus connection the Wallbox Block is accessed via REST-API - we get the status Updates like the app does
 - Paths are added to the DBus with default value 0 - including some settings like name, etc
-- After that a "loop" is started which pulls go-eCharger data every 750ms from the REST-API and updates the values in the DBus
+- After that a "loop" is started which pulls the wallbox data every 750ms from the REST-API and updates the values in the DBus
 
 Thats it 😄
 
 ### Restrictions
-This script until now supports reading values from the go-eCharger. Writing values is supported for  "Enable Charging", "Charging current" and "Max charging current". 
-Control of go-eCharger by the victron system in "Mode" "Auto" is not supported for now and changing the value will have no effect.
+This script until now supports reading values from the Wallbox Block.
 
 
 ### Pictures

@@ -14,6 +14,7 @@ else:
 import sys
 import time
 import requests # for http GET
+from requests.auth import HTTPBasicAuth
 import configparser # for config/ini file
  
 # our own packages from victron
@@ -21,11 +22,10 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), '/opt/victronenergy/d
 from vedbus import VeDbusService
 
 
-class DbusGoeChargerService:
-  def __init__(self, servicename, paths, productname='go-eCharger', connection='go-eCharger HTTP JSON service'):
+class DbusLoxoneWallboxService:
+  def __init__(self, servicename, paths, productname='loxone-wallbox', connection='Loxone Miniserver HTTP API'):
     config = self._getConfig()
     deviceinstance = int(config['DEFAULT']['Deviceinstance'])
-    hardwareVersion = int(config['DEFAULT']['HardwareVersion'])
     acPosition = int(config['DEFAULT']['AcPosition'])
     pauseBetweenRequests = int(config['ONPREMISE']['PauseBetweenRequests']) # in ms
 
@@ -43,7 +43,7 @@ class DbusGoeChargerService:
     ]
     
     #get data from go-eCharger
-    data = self._getGoeChargerData('sse,fwv')
+    data = self._getLoxoneWallboxChargerData('sse,fwv')
 
     # Create the management objects, as specified in the ccgx dbus-api document
     self._dbusservice.add_path('/Mgmt/ProcessName', __file__)
@@ -63,7 +63,7 @@ class DbusGoeChargerService:
            pass
        self._dbusservice.add_path('/FirmwareVersion', fwv)
        self._dbusservice.add_path('/Serial', data['sse'])
-    self._dbusservice.add_path('/HardwareVersion', hardwareVersion)
+    self._dbusservice.add_path('/HardwareVersion', 1)
     self._dbusservice.add_path('/Connected', 1)
     self._dbusservice.add_path('/UpdateIndex', 0)
     self._dbusservice.add_path('/Position', acPosition)
@@ -108,15 +108,11 @@ class DbusGoeChargerService:
     return int(value)
   
   
-  def _getGoeChargerStatusUrl(self):
+  def _getLoxoneWallboxStatusUrl(self):
     config = self._getConfig()
-    accessType = config['DEFAULT']['AccessType']
-    
-    if accessType == 'OnPremise': 
-      URL = "http://%s/api/status" % (config['ONPREMISE']['Host'])
-    else:
-      raise ValueError("AccessType %s is not supported" % (config['DEFAULT']['AccessType']))
-    
+
+    URL = "http://%s/jdev/sps/io/%s/all" % (config['LOXONE']['MS_IP'], config['LOXONE']['WALLBOX_UUID_OR_NAME'])
+
     return URL
   
   def _getGoeChargerMqttPayloadUrl(self, parameter, value):
@@ -131,12 +127,14 @@ class DbusGoeChargerService:
     return URL
   
   def _setGoeChargerValue(self, parameter, value):
+    config = self._getConfig()
     URL = self._getGoeChargerMqttPayloadUrl(parameter, str(value))
-    request_data = requests.get(url = URL)
+    basic = HTTPBasicAuth(config['LOXONE']['MS_USERNAME'], config['LOXONE']['MS_PASSWORD'])
+    request_data = requests.get(url = URL, auth=basic)
     
     # check for response
     if not request_data:
-      raise ConnectionError("No response from go-eCharger - %s" % (URL))
+      raise ConnectionError("No response from Miniserver - %s" % (URL))
     
     json_data = request_data.json()
     
@@ -151,16 +149,18 @@ class DbusGoeChargerService:
       return False
     
  
-  def _getGoeChargerData(self, filter):
-    URL = "%s?filter=%s" % (self._getGoeChargerStatusUrl(), filter)
+  def _getLoxoneWallboxChargerData(self):
+    config = self._getConfig()
+    basic = HTTPBasicAuth(config['LOXONE']['MS_USERNAME'], config['LOXONE']['MS_PASSWORD'])
+    URL = self._getLoxoneWallboxStatusUrl()
     try:
-       request_data = requests.get(url = URL, timeout=1)
+       request_data = requests.get(url = URL, auth=basic, timeout=1)
     except Exception:
        return None
     
     # check for response
     if not request_data:
-        raise ConnectionError("No response from go-eCharger - %s" % (URL))
+        raise ConnectionError("No response from Miniserver - %s" % (URL))
     
     json_data = request_data.json()     
     
@@ -182,7 +182,7 @@ class DbusGoeChargerService:
   def _update(self):   
     try:
        #get data from go-eCharger
-       data = self._getGoeChargerData('nrg,eto,wh,alw,amp,ama,car,tmp,tma')
+       data = self._getLoxoneWallboxChargerData()
        
        if data is not None:
 
@@ -206,53 +206,39 @@ class DbusGoeChargerService:
           15 = PF N
           '''
           config = self._getConfig()
-          hardwareVersion = int(config['DEFAULT']['HardwareVersion'])
 
           #send data to DBus
-          self._dbusservice['/Ac/Voltage'] = int(data['nrg'][0])
-          self._dbusservice['/Ac/L1/Power'] = int(data['nrg'][7])
-          self._dbusservice['/Ac/L2/Power'] = int(data['nrg'][8])
-          self._dbusservice['/Ac/L3/Power'] = int(data['nrg'][9])
-          self._dbusservice['/Ac/Power'] = int(data['nrg'][11])
-          self._dbusservice['/Current'] = max(data['nrg'][4], data['nrg'][5], data['nrg'][6])
-          if int(hardwareVersion) < 4: 
-            self._dbusservice['/Ac/Energy/Forward'] = int(float(data['eto']) / 1000.0)
-          else:
-            self._dbusservice['/Ac/Energy/Forward'] = round(data['wh'] / 1000, 2)
+          #self._dbusservice['/Ac/Voltage'] = int(data['nrg'][0])
+          #self._dbusservice['/Ac/L1/Power'] = int(data['nrg'][7])
+          #self._dbusservice['/Ac/L2/Power'] = int(data['nrg'][8])
+          #self._dbusservice['/Ac/L3/Power'] = int(data['nrg'][9])
+          self._dbusservice['/Ac/Power'] = int(data['LL']['output3']['value'])
+          #self._dbusservice['/Current'] = max(data['nrg'][4], data['nrg'][5], data['nrg'][6])
+          self._dbusservice['/Ac/Energy/Forward'] = round(data['LL']['output7']['value'], 2)
           
-          self._dbusservice['/StartStop'] = int(data['alw'])
-          self._dbusservice['/SetCurrent'] = int(data['amp'])
-          self._dbusservice['/MaxCurrent'] = int(data['ama']) 
+          self._dbusservice['/StartStop'] = int(data['LL']['output0']['value'])
+          #self._dbusservice['/SetCurrent'] = int(data['amp'])
+          #self._dbusservice['/MaxCurrent'] = int(data['ama'])
 
           # update chargingTime, increment charge time only on active charging (2), reset when no car connected (1)
           timeDelta = time.time() - self._lastUpdate
-          if int(data['car']) == 2 and self._lastUpdate > 0:  # vehicle loads
+          if int(data['LL']['output2']['value']) == 1 and self._lastUpdate > 0:  # vehicle loads
             self._chargingTime += timeDelta
-          elif int(data['car']) == 1:  # charging station ready, no vehicle
+          elif int(data['LL']['output1']['value']) == 1:  # charging station ready, no vehicle
             self._chargingTime = 0
           self._dbusservice['/ChargingTime'] = int(self._chargingTime)
 
           self._dbusservice['/Mode'] = 0  # Manual, no control
           
           config = self._getConfig()
-          hardwareVersion = int(config['DEFAULT']['HardwareVersion'])
-          if '/MCU/Temperature' in self._dbusservice: # check if path exists, at some point it was removed
-             if hardwareVersion >= 3:
-                self._dbusservice['/MCU/Temperature'] = int(data['tma'][0] if data['tma'][0] else 0)
-             else:
-                self._dbusservice['/MCU/Temperature'] = int(data['tmp'])
 
           # carState, null if internal error (Unknown/Error=0, Idle=1, Charging=2, WaitCar=3, Complete=4, Error=5)
           # status 0=Disconnected; 1=Connected; 2=Charging; 3=Charged; 4=Waiting for sun; 5=Waiting for RFID; 6=Waiting for start; 7=Low SOC; 8=Ground fault; 9=Welded contacts; 10=CP Input shorted; 11=Residual current detected; 12=Under voltage detected; 13=Overvoltage detected; 14=Overheating detected
           status = 0
-          if int(data['car']) == 1:
-            status = 0
-          elif int(data['car']) == 2:
+          if int(data['LL']['output2']['value']) == 1:
             status = 2
-          elif int(data['car']) == 3:
-            status = 6
-          elif int(data['car']) == 4:
-            status = 3
+          elif int(data['LL']['output1']['value']) == 2:
+            status = 1
           self._dbusservice['/Status'] = status
 
           #logging
@@ -279,16 +265,16 @@ class DbusGoeChargerService:
  
   def _handlechangedvalue(self, path, value):
     logging.info("someone else updated %s to %s" % (path, value))
-    
-    if path == '/SetCurrent':
-      return self._setGoeChargerValue('amp', value)
-    elif path == '/StartStop':
-      return self._setGoeChargerValue('alw', value)
-    elif path == '/MaxCurrent':
-      return self._setGoeChargerValue('ama', value)
-    else:
-      logging.info("mapping for evcharger path %s does not exist" % (path))
-      return False
+    #if path == '/SetCurrent':
+    #  return self._setGoeChargerValue('amp', value)
+    #elif path == '/StartStop':
+    #  return self._setGoeChargerValue('alw', value)
+    #elif path == '/MaxCurrent':
+    #  return self._setGoeChargerValue('ama', value)
+    #else:
+    #  logging.info("mapping for evcharger path %s does not exist" % (path))
+    #  return False
+    return True
 
 
 def main():
@@ -321,7 +307,7 @@ def main():
       _s = lambda p, v: (str(v) + 's')
      
       #start our main-service
-      pvac_output = DbusGoeChargerService(
+      pvac_output = DbusLoxoneWallboxService(
         servicename='com.victronenergy.evcharger',
         paths={
           '/Ac/Power': {'initial': 0, 'textformat': _w},
