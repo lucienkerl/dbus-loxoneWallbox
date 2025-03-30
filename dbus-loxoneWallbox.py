@@ -231,7 +231,7 @@ class DbusLoxoneWallboxService:
           status = 0
           if int(data['LL']['output2']['value']) == 1:
             status = 2
-          elif int(data['LL']['output1']['value']) == 2:
+          elif int(data['LL']['output1']['value']) == 1:
             status = 1
           self._dbusservice['/Status'] = status
 
