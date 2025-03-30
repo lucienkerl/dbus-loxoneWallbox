@@ -55,14 +55,8 @@ class DbusLoxoneWallboxService:
     self._dbusservice.add_path('/ProductId', 0xFFFF) # 
     self._dbusservice.add_path('/ProductName', productname)
     self._dbusservice.add_path('/CustomName', productname)    
-    if data:
-       fwv = data['fwv']
-       try:
-           fwv = int(data['fwv'].replace('.', ''))
-       except:
-           pass
-       self._dbusservice.add_path('/FirmwareVersion', fwv)
-       self._dbusservice.add_path('/Serial', data['sse'])
+    self._dbusservice.add_path('/FirmwareVersion', 0)
+    self._dbusservice.add_path('/Serial', 0)
     self._dbusservice.add_path('/HardwareVersion', 1)
     self._dbusservice.add_path('/Connected', 1)
     self._dbusservice.add_path('/UpdateIndex', 0)
